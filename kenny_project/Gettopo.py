@@ -33,7 +33,7 @@ class Gettopo(app_manager.RyuApp):
 	
 	data = "{\n\"switch\":" + switch_json + ",\n\"link\":" + link_json + ",\n\"host\":" + host_json + "\n}";
 
-	with open('/var/www/html/SDN/MultiForce/topo_data.json', 'w') as f:
+	with open('/var/www/html/SDN/SDN_topo/topo_data.json', 'w') as f:
 		f.write(data)
 
 #                                                    __----~~~~~~~~~~~------___
