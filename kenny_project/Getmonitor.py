@@ -8,7 +8,7 @@ from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
 
-monitor_time = 10
+monitor_time = 5
 
 tx_now = [0 for n in range(0,30)]
 tx_last = [0 for n in range(0,30)]
