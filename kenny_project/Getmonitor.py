@@ -1,4 +1,5 @@
 import json
+import MySQLdb
 
 from operator import attrgetter
 
@@ -110,6 +111,16 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 
 	port_data +="\n]"
 	port_first=True
+
+	try:
+	    db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
+	    cursor = db.cursor()
+	    #sql = "INSERT INTO total_flow_data (tx_flow, rx_flow) VALUES ('%d','%d')" % (,)
+	    cursor.execute("INSERT INTO total_flow_data (tx_flow, rx_flow) VALUES ('1','2')")
+	    db.commit()
+	    db.close()
+	except MySQLdb.Error as e:
+  	    print "Error %d: %s" % (e.args[0], e.args[1])
 
 	with open('/var/www/html/SDN/SDN_web/monitor_port_data.json', 'w') as f:
 		f.write(port_data)
