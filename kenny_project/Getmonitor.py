@@ -76,7 +76,7 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	flow_data +="\n]"
 	flow_first=True
 
-	with open('/var/www/html/SDN/SDN_topo/monitor_flow_data.json', 'w') as f:
+	with open('/var/www/html/SDN/SDN_web/monitor_flow_data.json', 'w') as f:
 		f.write(flow_data)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
@@ -111,7 +111,7 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	port_data +="\n]"
 	port_first=True
 
-	with open('/var/www/html/SDN/SDN_topo/monitor_port_data.json', 'w') as f:
+	with open('/var/www/html/SDN/SDN_web/monitor_port_data.json', 'w') as f:
 		f.write(port_data)
     def change_tx_now(self,num1,num2):
         global tx_now
