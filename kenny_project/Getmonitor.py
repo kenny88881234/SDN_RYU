@@ -87,6 +87,9 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	port_first = True
 	port_data = "[\n"
 
+	db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
+        cursor = db.cursor()
+
         for stat in sorted(body, key=attrgetter('port_no')):
 
 	    if stat.port_no <= 6 :
@@ -102,6 +105,8 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
             self.change_rx_last(num,rx_now[num])
 
 	    if stat.port_no <= 6 :
+		sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (ev.msg.datapath.id, stat.port_no, stat.tx_bytes, stat.rx_bytes)
+                cursor.execute(sql)
 	    	if port_first == False :
             	    port_data += ","
 	    	else :
@@ -112,16 +117,9 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	port_data +="\n]"
 	port_first=True
 
-	try:
-	    db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
-	    cursor = db.cursor()
-	    #sql = "INSERT INTO total_flow_data (tx_flow, rx_flow) VALUES ('%d','%d')" % (,)
-	    cursor.execute("INSERT INTO total_flow_data (tx_flow, rx_flow) VALUES ('1','2')")
-	    db.commit()
-	    db.close()
-	except MySQLdb.Error as e:
-  	    print "Error %d: %s" % (e.args[0], e.args[1])
-
+	db.commit()
+	db.close()
+	
 	with open('/var/www/html/SDN/SDN_web/monitor_port_data.json', 'w') as f:
 		f.write(port_data)
     def change_tx_now(self,num1,num2):
