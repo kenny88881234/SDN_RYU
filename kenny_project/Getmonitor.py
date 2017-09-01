@@ -1,5 +1,6 @@
 import json
 import MySQLdb
+import numpy
 
 from operator import attrgetter
 
@@ -59,9 +60,14 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
-        body = ev.msg.body
+        tx = numpy.zeros((3,5),int)
+	rx = numpy.zeros((3,5),int)
+	body = ev.msg.body
 	flow_first = True
 	flow_data = "[\n"
+
+	db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
+        cursor = db.cursor()
 
         for stat in sorted([flow for flow in body if flow.priority == 1],
                            key=lambda flow: (flow.match['in_port'],
@@ -72,10 +78,23 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	    else :
 		flow_first=False
 
+	    if (stat.instructions[0].actions[0].port > 1) and (stat.instructions[0].actions[0].port < 5) :
+	    	tx[ev.msg.datapath.id][stat.instructions[0].actions[0].port] += stat.byte_count
+	    if (stat.match['in_port'] > 1) and (stat.match['in_port'] < 5) :
+		rx[ev.msg.datapath.id][stat.match['in_port']] += stat.byte_count
+
 	    flow_data += "{\n\"datapath_id\":\"" + str(ev.msg.datapath.id) + "\",\n\"in_port\":\"" + str(stat.match['in_port']) + "\",\n\"eth_dst\":\"" + str(stat.match['eth_dst']) + "\",\n\"port\":\"" + str(stat.instructions[0].actions[0].port) + "\",\n\"packet_count\":\"" + str(stat.packet_count) + "\",\n\"byte_count\":\"" + str(stat.byte_count) + "\"\n}"
 
 	flow_data +="\n]"
 	flow_first=True
+
+	for i in range (1, 2) :
+	    for j in range (2, 5) :
+		sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, tx[i][j], rx[i][j])
+            	cursor.execute(sql)
+
+	db.commit()
+        db.close()
 
 	with open('/var/www/html/SDN/SDN_web/monitor_flow_data.json', 'w') as f:
 		f.write(flow_data)
@@ -86,9 +105,6 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	body = ev.msg.body
 	port_first = True
 	port_data = "[\n"
-
-	db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
-        cursor = db.cursor()
 
         for stat in sorted(body, key=attrgetter('port_no')):
 
@@ -105,8 +121,6 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
             self.change_rx_last(num,rx_now[num])
 
 	    if stat.port_no <= 6 :
-		sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (ev.msg.datapath.id, stat.port_no, stat.tx_bytes, stat.rx_bytes)
-                cursor.execute(sql)
 	    	if port_first == False :
             	    port_data += ","
 	    	else :
@@ -117,9 +131,6 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	port_data +="\n]"
 	port_first=True
 
-	db.commit()
-	db.close()
-	
 	with open('/var/www/html/SDN/SDN_web/monitor_port_data.json', 'w') as f:
 		f.write(port_data)
     def change_tx_now(self,num1,num2):
