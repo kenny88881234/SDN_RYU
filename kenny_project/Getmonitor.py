@@ -1,6 +1,7 @@
 import json
 import MySQLdb
 import numpy
+import time
 
 from operator import attrgetter
 
@@ -19,6 +20,8 @@ tx_flow = [0 for n in range(0,30)]
 rx_now = [0 for n in range(0,30)]
 rx_last = [0 for n in range(0,30)]
 rx_flow = [0 for n in range(0,30)]
+
+time_data = time.strftime("%Y-%m-%d")
 
 class Getmonitor(simple_switch_13.SimpleSwitch13):
 
@@ -60,6 +63,7 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
+	global time_data
         tx = numpy.zeros((3,5),int)
 	rx = numpy.zeros((3,5),int)
 	body = ev.msg.body
@@ -92,6 +96,13 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	    for j in range (2, 5) :
 		sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, tx[i][j], rx[i][j])
             	cursor.execute(sql)
+
+	if time_data != time.strftime("%Y-%m-%d") :
+	    sql = "TRUNCATE total_flow_data"
+	    cursor.execute(sql)
+
+	time_data = time.strftime("%Y-%m-%d")
+	print(time_data)
 
 	db.commit()
         db.close()
