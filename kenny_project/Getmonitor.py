@@ -21,6 +21,12 @@ rx_now = [0 for n in range(0,30)]
 rx_last = [0 for n in range(0,30)]
 rx_flow = [0 for n in range(0,30)]
 
+total_tx = numpy.zeros((3,5),int)
+total_rx = numpy.zeros((3,5),int)
+old_tx = numpy.zeros((3,5),int)
+old_rx = numpy.zeros((3,5),int)
+to_zero = False
+
 time_data = time.strftime("%Y-%m-%d")
 
 class Getmonitor(simple_switch_13.SimpleSwitch13):
@@ -63,7 +69,7 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
-	global time_data
+	global time_data, total_tx, total_rx, old_tx, old_rx, to_zero
         tx = numpy.zeros((3,5),int)
 	rx = numpy.zeros((3,5),int)
 	body = ev.msg.body
@@ -93,13 +99,35 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	flow_first=True
 
 	for i in range (1, 2) :
+            for j in range (2, 5) :
+		if tx[i][j] < old_tx[i][j] or rx[i][j] < old_rx[i][j] :
+		    to_zero = True
+		else :
+		    to_zero = False
+
+	for i in range (1, 2) :
 	    for j in range (2, 5) :
-		sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, tx[i][j], rx[i][j])
-            	cursor.execute(sql)
+		if to_zero == False :
+		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j] + tx[i][j], total_rx[i][j] + rx[i][j])
+                    cursor.execute(sql)
+		else :
+		    total_tx[i][j] += old_tx[i][j]
+		    total_rx[i][j] += old_rx[i][j]
+		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j], total_rx[i][j])
+            	    cursor.execute(sql)
+
+		old_tx[i][j] = tx[i][j]
+		old_rx[i][j] = rx[i][j]
 
 	if time_data != time.strftime("%Y-%m-%d") :
 	    sql = "TRUNCATE total_flow_data"
 	    cursor.execute(sql)
+	    for i in range (1, 2) :
+                for j in range (2, 5) :
+		    total_tx[i][j]
+		    total_rx[i][j]
+		    old_tx[i][j]
+		    old_rx[i][j]
 
 	time_data = time.strftime("%Y-%m-%d")
 	print(time_data)
