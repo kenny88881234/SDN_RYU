@@ -100,10 +100,14 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 
 	for i in range (1, 2) :
             for j in range (2, 5) :
+		if to_zero == True :
+		    to_zero = False
+		    break;
 		if tx[i][j] < old_tx[i][j] or rx[i][j] < old_rx[i][j] :
 		    to_zero = True
-		else :
-		    to_zero = False
+		    break;
+	    if to_zero == True :
+		break;
 
 	for i in range (1, 2) :
 	    for j in range (2, 5) :
@@ -124,10 +128,10 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	    cursor.execute(sql)
 	    for i in range (1, 2) :
                 for j in range (2, 5) :
-		    total_tx[i][j]
-		    total_rx[i][j]
-		    old_tx[i][j]
-		    old_rx[i][j]
+		    total_tx[i][j] = 0
+		    total_rx[i][j] = 0
+		    old_tx[i][j] = 0
+		    old_rx[i][j] = 0
 
 	time_data = time.strftime("%Y-%m-%d")
 	print(time_data)
