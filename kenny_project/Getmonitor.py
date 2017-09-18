@@ -10,6 +10,8 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
+from ryu.lib import ofctl_v1_3
+from ryu.ofproto import ofproto_v1_3
 
 monitor_time = 5
 
@@ -25,6 +27,8 @@ total_tx = numpy.zeros((3,5),int)
 total_rx = numpy.zeros((3,5),int)
 old_tx = numpy.zeros((3,5),int)
 old_rx = numpy.zeros((3,5),int)
+yesterday_tx = numpy.zeros((3,5),int)
+yesterday_rx = numpy.zeros((3,5),int)
 to_zero = False
 
 time_data = time.strftime("%Y-%m-%d")
@@ -69,7 +73,7 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
-	global time_data, total_tx, total_rx, old_tx, old_rx, to_zero
+	global time_data, total_tx, total_rx, old_tx, old_rx, to_zero, yesterday_tx, yesterday_rx
         tx = numpy.zeros((3,5),int)
 	rx = numpy.zeros((3,5),int)
 	body = ev.msg.body
@@ -112,12 +116,12 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	for i in range (1, 2) :
 	    for j in range (2, 5) :
 		if to_zero == False :
-		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j] + tx[i][j], total_rx[i][j] + rx[i][j])
+		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j] + tx[i][j] - yesterday_tx[i][j], total_rx[i][j] + rx[i][j] - yesterday_rx[i][j])
                     cursor.execute(sql)
 		else :
 		    total_tx[i][j] += old_tx[i][j]
 		    total_rx[i][j] += old_rx[i][j]
-		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j], total_rx[i][j])
+		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j] - yesterday_tx[i][j], total_rx[i][j] - yesterday_rx[i][j])
             	    cursor.execute(sql)
 
 		old_tx[i][j] = tx[i][j]
@@ -126,8 +130,15 @@ class Getmonitor(simple_switch_13.SimpleSwitch13):
 	if time_data != time.strftime("%Y-%m-%d") :
 	    sql = "TRUNCATE total_flow_data"
 	    cursor.execute(sql)
+
 	    for i in range (1, 2) :
                 for j in range (2, 5) :
+		    if to_zero == False :
+			yesterday_tx[i][j] = total_tx[i][j] + tx[i][j]
+			yesterday_rx[i][j] = total_rx[i][j] + rx[i][j]
+		    else :
+			yesterday_tx[i][j] = total_tx[i][j]
+			yesterday_rx[i][j] = total_rx[i][j]
 		    total_tx[i][j] = 0
 		    total_rx[i][j] = 0
 		    old_tx[i][j] = 0
