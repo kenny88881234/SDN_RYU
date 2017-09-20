@@ -4,8 +4,7 @@ import numpy
 import time
 
 from operator import attrgetter
-
-from ryu.app import simple_switch_13
+from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
@@ -33,7 +32,8 @@ to_zero = False
 
 time_data = time.strftime("%Y-%m-%d")
 
-class Getmonitor(simple_switch_13.SimpleSwitch13):
+class Getmonitor(app_manager.RyuApp):
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
         super(Getmonitor, self).__init__(*args, **kwargs)
