@@ -2,6 +2,7 @@ import json
 import MySQLdb
 import numpy
 import time
+import subprocess,sys
 
 from operator import attrgetter
 from ryu.base import app_manager
@@ -28,6 +29,7 @@ old_tx = numpy.zeros((3,5),int)
 old_rx = numpy.zeros((3,5),int)
 yesterday_tx = numpy.zeros((3,5),int)
 yesterday_rx = numpy.zeros((3,5),int)
+limit_flag = numpy.zeros((3,5),int)
 to_zero = False
 
 time_data = time.strftime("%Y-%m-%d")
@@ -39,6 +41,20 @@ class Getmonitor(app_manager.RyuApp):
         super(Getmonitor, self).__init__(*args, **kwargs)
         self.datapaths = {}
         self.monitor_thread = hub.spawn(self._monitor)
+	with open('/var/www/html/SDN/SDN_web/everydaylimit.json','r') as load_f:
+            load_dict = json.load(load_f)
+	for i in range (1, 2) :
+            for j in range (2, 5) :
+	        if str(i) in load_dict and str(j-1) in load_dict[str(i)] :
+		    load_dict[str(i)][str(j-1)]['flag'] = '0'
+	with open('/var/www/html/SDN/SDN_web/everydaylimit.json','w') as limit:
+	    json.dump(load_dict,limit)
+	db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
+        cursor = db.cursor()
+	sql = "TRUNCATE total_flow_data"
+        cursor.execute(sql)
+	db.commit()
+        db.close()
 
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -73,12 +89,25 @@ class Getmonitor(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
-	global time_data, total_tx, total_rx, old_tx, old_rx, to_zero, yesterday_tx, yesterday_rx
+	global time_data, total_tx, total_rx, old_tx, old_rx, to_zero, yesterday_tx, yesterday_rx, limit_flag
         tx = numpy.zeros((3,5),int)
 	rx = numpy.zeros((3,5),int)
 	body = ev.msg.body
 	flow_first = True
 	flow_data = "[\n"
+	ip = []
+	for i in range (0, 3) :
+	    new = []
+    	    for j in range (0, 5) :
+        	new.append('0')
+    	    ip.append(new)
+
+	with open('/var/www/html/SDN/SDN_web/everydaylimit.json','r') as load_f:
+            load_dict = json.load(load_f)
+	with open('/var/www/html/SDN/SDN_web/topo_data.json','r') as topo_f:
+	    topo = json.load(topo_f)
+	for i in range(0,len(topo['host'])) :
+		ip[int(topo['host'][i]['port']['dpid'])][int(topo['host'][i]['port']['port_no'])] = topo['host'][i]['ipv4'][0]
 
 	db = MySQLdb.connect(host="localhost", user="root", passwd="root", db="total_flow")
         cursor = db.cursor()
@@ -95,7 +124,7 @@ class Getmonitor(app_manager.RyuApp):
 	    if (stat.instructions[0].actions[0].port > 1) and (stat.instructions[0].actions[0].port < 5) :
 	    	tx[ev.msg.datapath.id][stat.instructions[0].actions[0].port] += stat.byte_count
 	    if (stat.match['in_port'] > 1) and (stat.match['in_port'] < 5) :
-		rx[ev.msg.datapath.id][stat.match['in_port']] += stat.byte_count
+	         rx[ev.msg.datapath.id][stat.match['in_port']] += stat.byte_count
 
 	    flow_data += "{\n\"datapath_id\":\"" + str(ev.msg.datapath.id) + "\",\n\"in_port\":\"" + str(stat.match['in_port']) + "\",\n\"eth_dst\":\"" + str(stat.match['eth_dst']) + "\",\n\"port\":\"" + str(stat.instructions[0].actions[0].port) + "\",\n\"packet_count\":\"" + str(stat.packet_count) + "\",\n\"byte_count\":\"" + str(stat.byte_count) + "\"\n}"
 
@@ -118,11 +147,61 @@ class Getmonitor(app_manager.RyuApp):
 		if to_zero == False :
 		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j] + tx[i][j] - yesterday_tx[i][j], total_rx[i][j] + rx[i][j] - yesterday_rx[i][j])
                     cursor.execute(sql)
+		    if str(i) in load_dict and str(j-1) in load_dict[str(i)] :
+			flow_str=str(total_tx[i][j] + tx[i][j] - yesterday_tx[i][j] + total_rx[i][j] + rx[i][j] - yesterday_rx[i][j])
+			if len(flow_str) == 10 :
+			    flow_num=float(flow_str[0]+'.'+flow_str[1])
+			if len(flow_str) == 9 :
+			    flow_num=float('0.'+flow_str[0])
+			if len(flow_str) <= 8 :
+			    flow_num=0
+			print(flow_num)
+			if float(load_dict[str(i)][str(j-1)]['limit']) != 0.0 :
+		    	    if float(load_dict[str(i)][str(j-1)]['limit']) <= flow_num :
+			    	if load_dict[str(i)][str(j-1)]['flag'] == '0' :
+		            	    cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "'+load_dict[str(i)][str(j-1)]['limitnum']+'"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
+			    	    subprocess.call(cmd , shell=True)
+				    load_dict[str(i)][str(j-1)]['flag'] = '1'
+			    else :
+			    	if load_dict[str(i)][str(j-1)]['flag'] == '1' :
+                                    cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
+                                    subprocess.call(cmd , shell=True)
+                                    load_dict[str(i)][str(j-1)]['flag'] = '0'
+			else :
+			    if load_dict[str(i)][str(j-1)]['flag'] == '1' :
+                                cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
+                                subprocess.call(cmd , shell=True)
+                                load_dict[str(i)][str(j-1)]['flag'] = '0'
 		else :
 		    total_tx[i][j] += old_tx[i][j]
 		    total_rx[i][j] += old_rx[i][j]
 		    sql = "INSERT INTO total_flow_data (dpid, port_no, tx_flow, rx_flow) VALUES ('%d', '%d', '%d', '%d')" % (i, j, total_tx[i][j] - yesterday_tx[i][j], total_rx[i][j] - yesterday_rx[i][j])
             	    cursor.execute(sql)
+		    if str(i) in load_dict and str(j-1) in load_dict[str(i)] :
+                        flow_str=str(total_tx[i][j] + tx[i][j] - yesterday_tx[i][j] + total_rx[i][j] + rx[i][j] - yesterday_rx[i][j])
+                        if len(flow_str) == 10 :
+                            flow_num=float(flow_str[0]+'.'+flow_str[1])
+                        if len(flow_str) == 9 :
+                            flow_num=float('0.'+flow_str[0])
+                        if len(flow_str) <= 8 :
+                            flow_num=0
+                        print(flow_num)
+                        if float(load_dict[str(i)][str(j-1)]['limit']) != 0.0 :
+                            if float(load_dict[str(i)][str(j-1)]['limit']) <= flow_num :
+                                if load_dict[str(i)][str(j-1)]['flag'] == '0' :
+                                    cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "'+load_dict[str(i)][str(j-1)]['limitnum']+'"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
+                                    subprocess.call(cmd , shell=True)
+                                    load_dict[str(i)][str(j-1)]['flag'] = '1'
+                            else :
+                                if load_dict[str(i)][str(j-1)]['flag'] == '1' :
+                                    cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
+                                    subprocess.call(cmd , shell=True)
+                                    load_dict[str(i)][str(j-1)]['flag'] = '0'
+                        else :
+                            if load_dict[str(i)][str(j-1)]['flag'] == '1' :
+                                cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
+                                subprocess.call(cmd , shell=True)
+                                load_dict[str(i)][str(j-1)]['flag'] = '0'
 
 		old_tx[i][j] = tx[i][j]
 		old_rx[i][j] = rx[i][j]
@@ -150,6 +229,8 @@ class Getmonitor(app_manager.RyuApp):
 	db.commit()
         db.close()
 
+	with open('/var/www/html/SDN/SDN_web/everydaylimit.json','w') as limit:
+            json.dump(load_dict,limit)
 	with open('/var/www/html/SDN/SDN_web/monitor_flow_data.json', 'w') as f:
 		f.write(flow_data)
 
