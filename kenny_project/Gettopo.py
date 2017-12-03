@@ -29,7 +29,7 @@ class Gettopo(app_manager.RyuApp):
     	link_json = json.dumps([link.to_dict() for link in links],indent=2)
 	
 	hosts = get_host(self, None)
-	host_json = json.dumps([host.to_dict() for host in hosts],indent=2)
+	host_json = json.dumps([host.to_dict() for host in hosts if host.port.port_no != 1],indent=2)
 	
 	data = "{\n\"switch\":" + switch_json + ",\n\"link\":" + link_json + ",\n\"host\":" + host_json + "\n}";
 
