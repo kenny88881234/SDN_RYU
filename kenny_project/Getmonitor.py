@@ -31,7 +31,7 @@ yesterday_tx = numpy.zeros((3,5),int)
 yesterday_rx = numpy.zeros((3,5),int)
 limit_flag = numpy.zeros((3,5),int)
 to_zero = False
-flag = False
+flag = numpy.zeros((3,5),int)
 
 time_data = time.strftime("%Y-%m-%d")
 
@@ -160,19 +160,19 @@ class Getmonitor(app_manager.RyuApp):
 			    	if load_dict[str(i)][str(j-1)]['flag'] == '0' :
 		            	    cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "'+load_dict[str(i)][str(j-1)]['limitnum']+'"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
 			    	    subprocess.call(cmd , shell=True)
-				    flag = True
+				    flag[i][j] = 1
 				    load_dict[str(i)][str(j-1)]['flag'] = '1'
 			    else :
-			    	if load_dict[str(i)][str(j-1)]['flag'] == '1' :
+			    	if load_dict[str(i)][str(j-1)]['flag'] == '1':
                                     cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
                                     subprocess.call(cmd , shell=True)
-				    flag = False
+				    flag[i][j] = 0
                                     load_dict[str(i)][str(j-1)]['flag'] = '0'
 			else :
-                            if load_dict[str(i)][str(j-1)]['flag'] == '1' and flag == True:
+                            if load_dict[str(i)][str(j-1)]['flag'] == '1' and flag[i][j] == 1:
                                 cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
                                 subprocess.call(cmd , shell=True)
-				flag = False
+				flag[i][j] = 0
                                 load_dict[str(i)][str(j-1)]['flag'] = '0'
 		else :
 		    total_tx[i][j] += old_tx[i][j]
@@ -204,19 +204,19 @@ class Getmonitor(app_manager.RyuApp):
                                 if load_dict[str(i)][str(j-1)]['flag'] == '0' :
                                     cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "'+load_dict[str(i)][str(j-1)]['limitnum']+'"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
                                     subprocess.call(cmd , shell=True)
-				    flag = True
+				    flag[i][j] = 1
                                     load_dict[str(i)][str(j-1)]['flag'] = '1'
                             else :
                                 if load_dict[str(i)][str(j-1)]['flag'] == '1' :
                                     cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
                                     subprocess.call(cmd , shell=True)
-				    flag = False
+				    flag[i][j] = 0
                                     load_dict[str(i)][str(j-1)]['flag'] = '0'
 			else :
-                            if load_dict[str(i)][str(j-1)]['flag'] == '1' and flag == True:
+                            if load_dict[str(i)][str(j-1)]['flag'] == '1' and flag[i][j] == 1:
                                 cmd = 'curl -X POST -d '+"'"+'{"priority": "2","match": {"nw_dst": "'+ip[i][j]+'"}, "actions":{"queue": "0"}}'+"'"+' http://localhost:8080/qos/rules/000000000000000'+str(i)
                                 subprocess.call(cmd , shell=True)
-				flag = False
+				flag[i][j] = 0
                                 load_dict[str(i)][str(j-1)]['flag'] = '0'
 
 		old_tx[i][j] = tx[i][j]
