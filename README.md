@@ -1,13 +1,19 @@
 # SDN_RYU
 
 conrtoller：
+
 1.安裝RYU
+
 2.下載此程式碼
+
 3.進到ryu/ryu/app
+
 4.執行程式：ryu-manager --verbose rest_qos.py qos_simple_switch_13.py rest_conf_switch.py ~/SDN_RYU/kenny_project/Getmonitor.py ~/SDN_RYU/kenny_project/Gettopo.py (qos_simple_switch_13.py依照RYU book QoS章節建置)
 
 switch(AC1750)：
+
 1.刷入openwrt(openwrt-ar71xx-generic-archer-c7-v2-squashfs-factory.bin)
+
 2.修改network設定：
 
 config interface 'loopback'
@@ -73,4 +79,5 @@ config interface 'port4'
         option netmask '255.255.255.0'
         
 3.ovs-vsctl add-br odin_1 ...etc(投影片裡有)
+
 4.安裝TC套件(QoS應用需要)
